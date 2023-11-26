@@ -95,14 +95,13 @@ class Main:
             y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
             x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
             ratio = min(x_ratio, y_ratio)
-            print('ratio:', ratio)
             scaled_rectangle = np.array(self.rectangle) / ratio
             new_rectangle = get_new_rectangle(
                 self.keypoints[old_frame_index], self.keypoints[new_frame_index],
                 self.descriptors[old_frame_index], self.descriptors[new_frame_index],
                 scaled_rectangle
             )
-            self.rectangle = tuple((new_rectangle * ratio).astype(int))
+            self.rectangle = tuple((new_rectangle * ratio).round().astype(int))
 
     def render(self):
         self.screen.fill((0, 0, 0))
