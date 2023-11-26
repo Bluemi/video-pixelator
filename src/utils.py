@@ -92,6 +92,9 @@ def normalize_rectangle(rectangle):
 
 
 def get_new_rectangle(old_keypoints, new_keypoints, old_descriptors, new_descriptors, old_rectangle):
+    if len(old_keypoints) == 0 or len(new_keypoints) == 0:
+        return old_rectangle
+
     filtered_keypoints, filtered_descriptors = filter_keypoints(old_keypoints, old_rectangle, old_descriptors)
 
     bf_matcher = cv2.BFMatcher()
@@ -105,6 +108,9 @@ def get_new_rectangle(old_keypoints, new_keypoints, old_descriptors, new_descrip
         if m.distance < 0.75 * n.distance:
             new_keypoint = new_keypoints[m.trainIdx]
             movements.append((old_keypoint.pt, new_keypoint.pt))
+
+    if len(movements) == 0:
+        return old_rectangle
 
     movements = np.array(movements)
     movements = movements[:, 1, :] - movements[:, 0, :]
