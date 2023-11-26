@@ -51,13 +51,13 @@ class Main:
                 self.next_frame()
                 self.update_needed = True
             elif text == 'k':
-                self.current_frame_index = max(self.current_frame_index - 1, 0)
+                self.prev_frame()
                 self.update_needed = True
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_ESCAPE:
                 self.running = False
             elif event.key == pg.K_LEFT:
-                self.current_frame_index = max(self.current_frame_index - 1, 0)
+                self.prev_frame()
                 self.update_needed = True
             elif event.key == pg.K_RIGHT:
                 self.next_frame()
@@ -81,16 +81,25 @@ class Main:
         old_frame_index = self.current_frame_index
         self.current_frame_index = min(self.current_frame_index + 1, len(self.frames) - 1)
 
-        if old_frame_index != self.current_frame_index and self.rectangle and self.rectangle[2] is not None:
-            current_frame = self.frames[self.current_frame_index]
+        self.update_rectangle(old_frame_index, self.current_frame_index)
+
+    def prev_frame(self):
+        old_frame_index = self.current_frame_index
+        self.current_frame_index = max(self.current_frame_index - 1, 0)
+
+        self.update_rectangle(old_frame_index, self.current_frame_index)
+
+    def update_rectangle(self, old_frame_index, new_frame_index):
+        if old_frame_index != new_frame_index and self.rectangle and self.rectangle[2] is not None:
+            current_frame = self.frames[new_frame_index]
             y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
             x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
             ratio = min(x_ratio, y_ratio)
             print('ratio:', ratio)
             scaled_rectangle = np.array(self.rectangle) / ratio
             new_rectangle = get_new_rectangle(
-                self.keypoints[old_frame_index], self.keypoints[self.current_frame_index],
-                self.descriptors[old_frame_index], self.descriptors[self.current_frame_index],
+                self.keypoints[old_frame_index], self.keypoints[new_frame_index],
+                self.descriptors[old_frame_index], self.descriptors[new_frame_index],
                 scaled_rectangle
             )
             self.rectangle = tuple((new_rectangle * ratio).astype(int))
