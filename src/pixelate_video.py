@@ -74,7 +74,7 @@ class Main:
                 else:
                     self.rectangle = normalize_rectangle(self.rectangle)
             self.update_needed = True
-        elif event.type == pg.WINDOWRESIZED:
+        elif event.type == pg.WINDOWRESIZED or event.type == pg.WINDOWENTER or event.type == pg.WINDOWFOCUSGAINED:
             self.update_needed = True
 
     def next_frame(self):
