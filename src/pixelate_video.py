@@ -5,7 +5,7 @@ import pygame as pg
 import numpy as np
 import cv2
 
-from utils import read_frames, calculate_keypoints, filter_keypoints, normalize_rectangle
+from utils import read_frames, calculate_keypoints, filter_keypoints, normalize_rectangle, get_new_rectangle
 
 SCREEN_SIZE = (1200, 675)
 
@@ -48,7 +48,7 @@ class Main:
         elif event.type == pg.TEXTINPUT:
             text = event.text.strip()
             if text == 'j':
-                self.current_frame_index = min(self.current_frame_index + 1, len(self.frames)-1)
+                self.next_frame()
                 self.update_needed = True
             elif text == 'k':
                 self.current_frame_index = max(self.current_frame_index - 1, 0)
@@ -60,7 +60,7 @@ class Main:
                 self.current_frame_index = max(self.current_frame_index - 1, 0)
                 self.update_needed = True
             elif event.key == pg.K_RIGHT:
-                self.current_frame_index = min(self.current_frame_index + 1, len(self.frames)-1)
+                self.next_frame()
                 self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
             self.rectangle = [*event.pos, None, None]
@@ -77,6 +77,24 @@ class Main:
         elif event.type == pg.WINDOWRESIZED:
             self.update_needed = True
 
+    def next_frame(self):
+        old_frame_index = self.current_frame_index
+        self.current_frame_index = min(self.current_frame_index + 1, len(self.frames) - 1)
+
+        if old_frame_index != self.current_frame_index and self.rectangle and self.rectangle[2] is not None:
+            current_frame = self.frames[self.current_frame_index]
+            y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
+            x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
+            ratio = min(x_ratio, y_ratio)
+            print('ratio:', ratio)
+            scaled_rectangle = np.array(self.rectangle) / ratio
+            new_rectangle = get_new_rectangle(
+                self.keypoints[old_frame_index], self.keypoints[self.current_frame_index],
+                self.descriptors[old_frame_index], self.descriptors[self.current_frame_index],
+                scaled_rectangle
+            )
+            self.rectangle = tuple((new_rectangle * ratio).astype(int))
+
     def render(self):
         self.screen.fill((0, 0, 0))
         current_frame = self.frames[self.current_frame_index]
@@ -88,7 +106,7 @@ class Main:
         # noinspection PyTypeChecker
         if self.rectangle and self.rectangle[2] is not None:
             scaled_rectangle = np.array(self.rectangle) / ratio
-            filtered_keypoints = filter_keypoints(self.keypoints[self.current_frame_index], scaled_rectangle)
+            filtered_keypoints, _ = filter_keypoints(self.keypoints[self.current_frame_index], scaled_rectangle)
             current_frame = cv2.drawKeypoints(
                 current_frame, filtered_keypoints, None,
                 (0, 255, 0), 4
