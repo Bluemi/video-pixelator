@@ -25,6 +25,7 @@ class Main:
 
         # control
         self.rectangle = None
+        self.show_keypoints = False
 
     def run(self):
         self.render()
@@ -52,6 +53,9 @@ class Main:
                 self.update_needed = True
             elif text == 'k':
                 self.prev_frame()
+                self.update_needed = True
+            elif text == 's':
+                self.show_keypoints = not self.show_keypoints
                 self.update_needed = True
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_ESCAPE:
@@ -111,19 +115,21 @@ class Main:
         x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
         ratio = min(x_ratio, y_ratio)
 
-        # noinspection PyTypeChecker
-        if self.rectangle and self.rectangle[2] is not None:
-            scaled_rectangle = np.array(self.rectangle) / ratio
-            filtered_keypoints, _ = filter_keypoints(self.keypoints[self.current_frame_index], scaled_rectangle)
-            current_frame = cv2.drawKeypoints(
-                current_frame, filtered_keypoints, None,
-                (0, 255, 0), 4
-            )
-        else:
-            current_frame = cv2.drawKeypoints(
-                current_frame, self.keypoints[self.current_frame_index], None,
-                (0, 255, 0), 4
-            )
+        # draw keypoints
+        if self.show_keypoints:
+            # noinspection PyTypeChecker
+            if self.rectangle and self.rectangle[2] is not None:
+                scaled_rectangle = np.array(self.rectangle) / ratio
+                filtered_keypoints, _ = filter_keypoints(self.keypoints[self.current_frame_index], scaled_rectangle)
+                current_frame = cv2.drawKeypoints(
+                    current_frame, filtered_keypoints, None,
+                    (0, 255, 0), 4
+                )
+            else:
+                current_frame = cv2.drawKeypoints(
+                    current_frame, self.keypoints[self.current_frame_index], None,
+                    (0, 255, 0), 4
+                )
         # scale to screen size
         new_dim = (int(current_frame.shape[1] * ratio), int(current_frame.shape[0] * ratio))
         current_frame = cv2.resize(current_frame, new_dim)
@@ -143,7 +149,7 @@ class Main:
 
 
 def main():
-    path = "data/input/workshop2.mp4"
+    path = "data/input/workshop.mp4"
     if len(sys.argv) > 1:
         path = sys.argv[1]
     frames = read_frames(path)
