@@ -67,3 +67,21 @@ def cascade_try(capture):
         pixelate_image(frame, cascades)
 
         frame_number += 1
+
+
+def filter_keypoints(keypoints, rectangle):
+    filtered = []
+    for keypoint in keypoints:
+        if rectangle[0] < keypoint.pt[0] < rectangle[2]:
+            if rectangle[1] < keypoint.pt[1] < rectangle[3]:
+                filtered.append(keypoint)
+    return filtered
+
+
+def normalize_rectangle(rectangle):
+    return (
+        min(rectangle[0], rectangle[2]),
+        min(rectangle[1], rectangle[3]),
+        max(rectangle[0], rectangle[2]),
+        max(rectangle[1], rectangle[3])
+    )

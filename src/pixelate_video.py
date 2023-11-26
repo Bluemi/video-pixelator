@@ -5,8 +5,7 @@ import pygame as pg
 import numpy as np
 import cv2
 
-from utils import read_frames, calculate_keypoints
-
+from utils import read_frames, calculate_keypoints, filter_keypoints, normalize_rectangle
 
 SCREEN_SIZE = (1200, 675)
 
@@ -14,14 +13,18 @@ SCREEN_SIZE = (1200, 675)
 class Main:
     def __init__(self, frames, keypoints, descriptors):
         pg.init()
-        self.screen = pg.display.set_mode(SCREEN_SIZE)
+        self.screen = pg.display.set_mode(SCREEN_SIZE, pg.RESIZABLE)
         self.running = True
         self.update_needed = False
 
+        # video and keypoints
         self.frames = frames
         self.keypoints = keypoints
         self.descriptors = descriptors
         self.current_frame_index = 0
+
+        # control
+        self.rectangle = None
 
     def run(self):
         self.render()
@@ -59,21 +62,51 @@ class Main:
             elif event.key == pg.K_RIGHT:
                 self.current_frame_index = min(self.current_frame_index + 1, len(self.frames)-1)
                 self.update_needed = True
+        elif event.type == pg.MOUSEBUTTONDOWN:
+            self.rectangle = [*event.pos, None, None]
+            self.update_needed = True
+        elif event.type == pg.MOUSEBUTTONUP:
+            if isinstance(self.rectangle, list):
+                self.rectangle[2] = event.pos[0]
+                self.rectangle[3] = event.pos[1]
+                if self.rectangle[0] == self.rectangle[2] or self.rectangle[1] == self.rectangle[3]:
+                    self.rectangle = None
+                else:
+                    self.rectangle = normalize_rectangle(self.rectangle)
+            self.update_needed = True
+        elif event.type == pg.WINDOWRESIZED:
+            self.update_needed = True
 
     def render(self):
+        self.screen.fill((0, 0, 0))
         current_frame = self.frames[self.current_frame_index]
 
-        current_frame = cv2.drawKeypoints(
-            current_frame, self.keypoints[self.current_frame_index], None,
-            (0, 255, 0), 4
-        )
-
-        # scale to screen size
-        y_ratio = SCREEN_SIZE[1] / current_frame.shape[0]
-        x_ratio = SCREEN_SIZE[0] / current_frame.shape[1]
+        y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
+        x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
         ratio = min(x_ratio, y_ratio)
+
+        # noinspection PyTypeChecker
+        if self.rectangle and self.rectangle[2] is not None:
+            scaled_rectangle = np.array(self.rectangle) / ratio
+            filtered_keypoints = filter_keypoints(self.keypoints[self.current_frame_index], scaled_rectangle)
+            current_frame = cv2.drawKeypoints(
+                current_frame, filtered_keypoints, None,
+                (0, 255, 0), 4
+            )
+        else:
+            current_frame = cv2.drawKeypoints(
+                current_frame, self.keypoints[self.current_frame_index], None,
+                (0, 255, 0), 4
+            )
+        # scale to screen size
         new_dim = (int(current_frame.shape[1] * ratio), int(current_frame.shape[0] * ratio))
         current_frame = cv2.resize(current_frame, new_dim)
+
+        # render rectangle
+        if self.rectangle and self.rectangle[2] is not None:
+            start_pos = (self.rectangle[0], self.rectangle[1])
+            end_pos = (self.rectangle[2], self.rectangle[3])
+            current_frame = cv2.rectangle(current_frame, start_pos, end_pos, (255, 0, 0), 2)
 
         # transform for pygame
         current_frame = cv2.cvtColor(current_frame, cv2.COLOR_BGR2RGB)
@@ -84,7 +117,7 @@ class Main:
 
 
 def main():
-    path = "data/input/example3.mp4"
+    path = "data/input/workshop2.mp4"
     if len(sys.argv) > 1:
         path = sys.argv[1]
     frames = read_frames(path)
@@ -95,4 +128,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
