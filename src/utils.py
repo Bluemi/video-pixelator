@@ -119,12 +119,25 @@ def get_new_rectangle(old_keypoints, new_keypoints, old_descriptors, new_descrip
 
     return old_rectangle + np.tile(avg_movement, 2)
 
-    # print('---')
-    # print('num old descriptors:', len(filtered_descriptors))
-    # print('num matches:', len(matches))
-    # print('num new descriptors:', len(new_descriptors))
 
-    # example = matches[0][0]
-    # print('\nexample:')
-    # print('distance', example.distance)
-    # print('trainIdx', example.trainIdx)
+def blur_rectangles(image, rectangles, ratio):
+    blurred_image = cv2.GaussianBlur(image, (21, 21), 0)
+    mask = np.zeros(image.shape[:2], dtype=float)
+    for rect in rectangles:
+        rect = np.round(rect / ratio).astype(int)
+        mask[rect[1]:rect[3], rect[0]:rect[2]] = 1
+
+    mask = cv2.GaussianBlur(mask, (21, 21), 0)
+    mask = mask.reshape((image.shape[0], image.shape[1], 1))
+
+    image = np.round(blurred_image * mask + image * (1.0 - mask))
+
+    return np.minimum(np.maximum(image, 0), 255).astype(np.uint8)
+
+
+def describe(name, a):
+    print('--- {} ---'.format(name))
+    print('\tdtype: {}'.format(str(a.dtype)))
+    print('\tmean: {}'.format(str(np.mean(a))))
+    print('\tmin: {}'.format(str(np.min(a))))
+    print('\tmax: {}'.format(str(np.max(a))))

@@ -5,7 +5,8 @@ import pygame as pg
 import numpy as np
 import cv2
 
-from utils import read_frames, calculate_keypoints, normalize_rectangle, get_new_rectangle, point_in_rect
+from utils import read_frames, calculate_keypoints, normalize_rectangle, get_new_rectangle, point_in_rect, \
+    blur_rectangles, describe
 
 SCREEN_SIZE = (1200, 675)
 
@@ -145,9 +146,6 @@ class Main:
         return new_rectangles
 
     def get_next_rectangle(self, rectangle, ratio, old_frame_index, new_frame_index):
-        print('rect:', rectangle)
-        print('old fi:', old_frame_index)
-        print('new fi:', new_frame_index)
         scaled_rectangle = rectangle / ratio
         new_rectangle = get_new_rectangle(
             self.keypoints[old_frame_index], self.keypoints[new_frame_index],
@@ -166,12 +164,16 @@ class Main:
         x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
         ratio = min(x_ratio, y_ratio)
 
+        # blur rectangles
+        current_frame = blur_rectangles(current_frame, self.get_current_rectangles(), ratio)
+
         # draw keypoints
         if self.show_keypoints:
             current_frame = cv2.drawKeypoints(
                 current_frame, self.keypoints[self.current_frame_index], None,
                 (0, 255, 0), 4
             )
+
         # scale to screen size
         new_dim = (int(current_frame.shape[1] * ratio), int(current_frame.shape[0] * ratio))
         current_frame = cv2.resize(current_frame, new_dim)
