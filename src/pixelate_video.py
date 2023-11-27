@@ -78,6 +78,10 @@ class Main:
             elif text == 'e':
                 self.export()
                 self.update_needed = True
+            elif event.text == 'd':
+                rects = [r for r in self.get_current_rectangles() if not point_in_rect(self.mouse_position, r)]
+                self.set_current_rectangles(rects)
+                self.update_needed = True
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_ESCAPE:
                 self.running = False
@@ -86,10 +90,6 @@ class Main:
                 self.update_needed = True
             elif event.key == pg.K_RIGHT:
                 self.next_frame()
-                self.update_needed = True
-            elif event.key == pg.K_BACKSPACE or event.key == pg.K_DELETE:
-                rects = [r for r in self.get_current_rectangles() if not point_in_rect(self.mouse_position, r)]
-                self.set_current_rectangles(rects)
                 self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
             hovered_rect_index = None
