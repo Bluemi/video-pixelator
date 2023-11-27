@@ -9,19 +9,6 @@ def show_image(image):
     plt.show()
 
 
-def pixelate_image(frame, cascades):
-    grayscale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = []
-    for cascade in cascades:
-        faces.extend(cascade.detectMultiScale(grayscale_frame, 1.1, 1, maxSize=(35, 35), minSize=(15, 15)))
-
-    print(faces)
-    if faces:
-        for x, y, w, h in faces:
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (2550, 0, 0), 2)
-        show_image(frame)
-
-
 def read_frames(path):
     capture = cv2.VideoCapture(path)
     fps = capture.get(cv2.CAP_PROP_FPS)
@@ -53,24 +40,6 @@ def calculate_keypoints(frames, algorithm='sift'):
     return keypoints, descriptors
 
 
-def cascade_try(capture):
-    cascades = []
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    cascades.append(face_cascade)
-    profile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_profileface.xml")
-    cascades.append(profile_cascade)
-
-    frame_number = 0
-    while True:
-        success, frame = capture.read()
-        if not success:
-            break
-
-        pixelate_image(frame, cascades)
-
-        frame_number += 1
-
-
 def point_in_rect(point, rect):
     return rect[0] < point[0] < rect[2] and rect[1] < point[1] < rect[3]
 
@@ -79,18 +48,11 @@ def filter_keypoints(keypoints, rectangle, descriptors=None):
     filtered = []
     filtered_descriptors = []
     for index, keypoint in enumerate(keypoints):
-        if point_in_rect(keypoint.pt, rectangle):
+        if rectangle.contains(keypoint.pt):
             filtered.append(keypoint)
             if descriptors is not None:
                 filtered_descriptors.append(descriptors[index])
     return filtered, filtered_descriptors
-
-
-def normalize_rectangle(rectangle):
-    return np.array([
-        min(rectangle[0], rectangle[2]), min(rectangle[1], rectangle[3]),
-        max(rectangle[0], rectangle[2]), max(rectangle[1], rectangle[3])
-    ])
 
 
 def get_new_rectangle(old_keypoints, new_keypoints, old_descriptors, new_descriptors, old_rectangle):
@@ -118,14 +80,14 @@ def get_new_rectangle(old_keypoints, new_keypoints, old_descriptors, new_descrip
     movements = movements[:, 1, :] - movements[:, 0, :]
     avg_movement = np.median(movements, axis=0)
 
-    return old_rectangle + np.tile(avg_movement, 2)
+    return Rectangle(old_rectangle.ident, old_rectangle.rect + np.tile(avg_movement, 2))
 
 
 def blur_rectangles(image, rectangles):
     blurred_image = cv2.GaussianBlur(image, (21, 21), 0)
     mask = np.zeros(image.shape[:2], dtype=float)
     for rect in rectangles:
-        rect = np.round(rect).astype(int)
+        rect = np.round(rect.rect).astype(int)
         rect = np.maximum(rect, 0)
         mask[rect[1]:rect[3], rect[0]:rect[2]] = 1
 
@@ -144,3 +106,24 @@ def describe(name, a):
     print('\tmean: {}'.format(str(np.mean(a))))
     print('\tmin: {}'.format(str(np.min(a))))
     print('\tmax: {}'.format(str(np.max(a))))
+
+
+class Rectangle:
+    def __init__(self, ident: int, rect: np.ndarray):
+        self.ident = ident
+        self.rect = rect
+
+    def normalize(self):
+        self.rect = np.array([
+            min(self.rect[0], self.rect[2]), min(self.rect[1], self.rect[3]),
+            max(self.rect[0], self.rect[2]), max(self.rect[1], self.rect[3])
+        ])
+
+    def contains(self, point):
+        return point_in_rect(point, self.rect)
+
+    def is_valid(self):
+        return self.rect[0] < self.rect[2] and self.rect[1] < self.rect[3]
+
+    def to_int(self):
+        self.rect = self.rect.round().astype(int)
