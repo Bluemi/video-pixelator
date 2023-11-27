@@ -24,7 +24,8 @@ class Main:
         self.current_frame_index = 0
 
         # control
-        self.rectangle = None
+        self.edit_rectangle = None
+        self.rectangles = []
         self.show_keypoints = False
 
     def run(self):
@@ -67,16 +68,18 @@ class Main:
                 self.next_frame()
                 self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
-            self.rectangle = [*event.pos, None, None]
+            self.edit_rectangle = np.array([*event.pos, *event.pos])
             self.update_needed = True
+        elif event.type == pg.MOUSEMOTION:
+            if self.edit_rectangle is not None:
+                self.edit_rectangle[2:] = event.pos
+                self.update_needed = True
         elif event.type == pg.MOUSEBUTTONUP:
-            if isinstance(self.rectangle, list):
-                self.rectangle[2] = event.pos[0]
-                self.rectangle[3] = event.pos[1]
-                if self.rectangle[0] == self.rectangle[2] or self.rectangle[1] == self.rectangle[3]:
-                    self.rectangle = None
-                else:
-                    self.rectangle = normalize_rectangle(self.rectangle)
+            if self.edit_rectangle is not None:
+                self.edit_rectangle[2:] = event.pos
+                if self.edit_rectangle[0] != self.edit_rectangle[2] and self.edit_rectangle[1] != self.edit_rectangle[3]:
+                    self.rectangles.append(normalize_rectangle(self.edit_rectangle))
+                self.edit_rectangle = None
             self.update_needed = True
         elif event.type == pg.WINDOWRESIZED or event.type == pg.WINDOWENTER or event.type == pg.WINDOWFOCUSGAINED:
             self.update_needed = True
@@ -94,18 +97,22 @@ class Main:
         self.update_rectangle(old_frame_index, self.current_frame_index)
 
     def update_rectangle(self, old_frame_index, new_frame_index):
-        if old_frame_index != new_frame_index and self.rectangle and self.rectangle[2] is not None:
-            current_frame = self.frames[new_frame_index]
-            y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
-            x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
-            ratio = min(x_ratio, y_ratio)
-            scaled_rectangle = np.array(self.rectangle) / ratio
-            new_rectangle = get_new_rectangle(
-                self.keypoints[old_frame_index], self.keypoints[new_frame_index],
-                self.descriptors[old_frame_index], self.descriptors[new_frame_index],
-                scaled_rectangle
-            )
-            self.rectangle = tuple((new_rectangle * ratio).round().astype(int))
+        if old_frame_index != new_frame_index:
+            new_rectangles = []
+            for rectangle in self.rectangles:
+                current_frame = self.frames[new_frame_index]
+                y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
+                x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
+                ratio = min(x_ratio, y_ratio)
+                scaled_rectangle = rectangle / ratio
+                new_rectangle = get_new_rectangle(
+                    self.keypoints[old_frame_index], self.keypoints[new_frame_index],
+                    self.descriptors[old_frame_index], self.descriptors[new_frame_index],
+                    scaled_rectangle
+                )
+                rectangle = (new_rectangle * ratio).round().astype(int)
+                new_rectangles.append(rectangle)
+            self.rectangles = new_rectangles
 
     def render(self):
         self.screen.fill((0, 0, 0))
@@ -117,28 +124,23 @@ class Main:
 
         # draw keypoints
         if self.show_keypoints:
-            # noinspection PyTypeChecker
-            if self.rectangle and self.rectangle[2] is not None:
-                scaled_rectangle = np.array(self.rectangle) / ratio
-                filtered_keypoints, _ = filter_keypoints(self.keypoints[self.current_frame_index], scaled_rectangle)
-                current_frame = cv2.drawKeypoints(
-                    current_frame, filtered_keypoints, None,
-                    (0, 255, 0), 4
-                )
-            else:
-                current_frame = cv2.drawKeypoints(
-                    current_frame, self.keypoints[self.current_frame_index], None,
-                    (0, 255, 0), 4
-                )
+            current_frame = cv2.drawKeypoints(
+                current_frame, self.keypoints[self.current_frame_index], None,
+                (0, 255, 0), 4
+            )
         # scale to screen size
         new_dim = (int(current_frame.shape[1] * ratio), int(current_frame.shape[0] * ratio))
         current_frame = cv2.resize(current_frame, new_dim)
 
         # render rectangle
-        if self.rectangle and self.rectangle[2] is not None:
-            start_pos = (self.rectangle[0], self.rectangle[1])
-            end_pos = (self.rectangle[2], self.rectangle[3])
+        for rectangle in self.rectangles:
+            start_pos = (rectangle[0], rectangle[1])
+            end_pos = (rectangle[2], rectangle[3])
             current_frame = cv2.rectangle(current_frame, start_pos, end_pos, (255, 0, 0), 2)
+        if self.edit_rectangle is not None:
+            start_pos = (self.edit_rectangle[0], self.edit_rectangle[1])
+            end_pos = (self.edit_rectangle[2], self.edit_rectangle[3])
+            current_frame = cv2.rectangle(current_frame, start_pos, end_pos, (255, 128, 0), 2)
 
         # transform for pygame
         current_frame = cv2.cvtColor(current_frame, cv2.COLOR_BGR2RGB)

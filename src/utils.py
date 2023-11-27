@@ -83,12 +83,10 @@ def filter_keypoints(keypoints, rectangle, descriptors=None):
 
 
 def normalize_rectangle(rectangle):
-    return (
-        min(rectangle[0], rectangle[2]),
-        min(rectangle[1], rectangle[3]),
-        max(rectangle[0], rectangle[2]),
-        max(rectangle[1], rectangle[3])
-    )
+    return np.array([
+        min(rectangle[0], rectangle[2]), min(rectangle[1], rectangle[3]),
+        max(rectangle[0], rectangle[2]), max(rectangle[1], rectangle[3])
+    ])
 
 
 def get_new_rectangle(old_keypoints, new_keypoints, old_descriptors, new_descriptors, old_rectangle):
