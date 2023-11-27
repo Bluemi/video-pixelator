@@ -4,6 +4,7 @@ import sys
 import pygame as pg
 import numpy as np
 import cv2
+from tqdm import tqdm
 
 from utils import read_frames, calculate_keypoints, normalize_rectangle, get_new_rectangle, point_in_rect, \
     blur_rectangles, describe
@@ -12,7 +13,7 @@ SCREEN_SIZE = (1200, 675)
 
 
 class Main:
-    def __init__(self, frames, keypoints, descriptors, auto_update_rectangles=False):
+    def __init__(self, frames, keypoints, descriptors, fps, auto_update_rectangles=False):
         pg.init()
         self.screen = pg.display.set_mode(SCREEN_SIZE, pg.RESIZABLE)
         self.running = True
@@ -23,6 +24,7 @@ class Main:
         self.keypoints = keypoints
         self.descriptors = descriptors
         self.current_frame_index = 0
+        self.fps = fps
 
         # control
         self.edit_rectangle = None
@@ -31,7 +33,7 @@ class Main:
         self.show_keypoints = False
         self.show_rects = True
         self.show_blur = False
-        self.mouse_position = pg.mouse.get_pos()
+        self.mouse_position = self.get_mouse_in_image_coordinates()
         self.auto_update_rectangles = auto_update_rectangles
 
     def run(self):
@@ -73,6 +75,9 @@ class Main:
             elif text == 't':
                 self.interpolate_rectangle()
                 self.update_needed = True
+            elif text == 'e':
+                self.export()
+                self.update_needed = True
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_ESCAPE:
                 self.running = False
@@ -95,30 +100,41 @@ class Main:
             if hovered_rect_index is not None:
                 self.move_rectangle_index = hovered_rect_index
             else:
-                self.edit_rectangle = np.array([*event.pos, *event.pos])
+                self.edit_rectangle = np.array([*self.mouse_position, *self.mouse_position])
             self.update_needed = True
         elif event.type == pg.MOUSEMOTION:
-            self.mouse_position = event.pos
+            self.mouse_position = self.get_mouse_in_image_coordinates()
             if self.edit_rectangle is not None:
-                self.edit_rectangle[2:] = event.pos
+                self.edit_rectangle[2:] = self.mouse_position
             elif self.move_rectangle_index != -1:
                 c_rect = self.get_current_rectangles()[self.move_rectangle_index]
                 if not (pg.key.get_mods() & pg.KMOD_SHIFT):
-                    c_rect[0] += event.rel[0]
-                    c_rect[1] += event.rel[1]
-                c_rect[2] = max(c_rect[2] + event.rel[0], c_rect[0]+1)
-                c_rect[3] = max(c_rect[3] + event.rel[1], c_rect[1]+1)
+                    ratio = self.get_ratio()
+                    c_rect[0] += int(round(event.rel[0] * ratio))
+                    c_rect[1] += int(round(event.rel[1] * ratio))
+                c_rect[2] = max(c_rect[2] + int(round(event.rel[0])), c_rect[0]+1)
+                c_rect[3] = max(c_rect[3] + int(round(event.rel[1])), c_rect[1]+1)
             self.update_needed = True
         elif event.type == pg.MOUSEBUTTONUP:
             self.move_rectangle_index = -1
             if self.edit_rectangle is not None:
-                self.edit_rectangle[2:] = event.pos
+                self.edit_rectangle[2:] = self.mouse_position
                 if (self.edit_rectangle[[0, 1]] != self.edit_rectangle[[2, 3]]).all():
-                    self.get_current_rectangles().append(normalize_rectangle(self.edit_rectangle))
+                    new_rect = normalize_rectangle(self.edit_rectangle)
+                    self.get_current_rectangles().append(new_rect)
                 self.edit_rectangle = None
             self.update_needed = True
         elif event.type == pg.WINDOWRESIZED or event.type == pg.WINDOWENTER or event.type == pg.WINDOWFOCUSGAINED:
             self.update_needed = True
+
+    def get_ratio(self):
+        frame_size = self.frames[0].shape
+        y_ratio = pg.display.get_window_size()[1] / frame_size[0]
+        x_ratio = pg.display.get_window_size()[0] / frame_size[1]
+        return min(x_ratio, y_ratio)
+
+    def get_mouse_in_image_coordinates(self):
+        return np.round(np.array(pg.mouse.get_pos()) / self.get_ratio()).astype(int)
 
     def next_frame(self):
         old_frame_index = self.current_frame_index
@@ -140,41 +156,34 @@ class Main:
         if old_frame_index == new_frame_index:
             raise ValueError('old_frame_index == new_frame_index ({})'.format(old_frame_index))
 
-        current_frame = self.frames[new_frame_index]
-        y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
-        x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
-        ratio = min(x_ratio, y_ratio)
-
         new_rectangles = []
         for rectangle in self.rectangles[old_frame_index]:
-            new_rectangle = self.get_next_rectangle(rectangle, ratio, old_frame_index, new_frame_index)
+            new_rectangle = self.get_next_rectangle(rectangle, old_frame_index, new_frame_index)
             if new_rectangle is not None:
                 new_rectangles.append(new_rectangle)
 
         return new_rectangles
 
-    def get_next_rectangle(self, rectangle, ratio, old_frame_index, new_frame_index):
-        scaled_rectangle = rectangle / ratio
+    def get_next_rectangle(self, rectangle, old_frame_index, new_frame_index):
+        scaled_rectangle = rectangle
         new_rectangle = get_new_rectangle(
             self.keypoints[old_frame_index], self.keypoints[new_frame_index],
             self.descriptors[old_frame_index], self.descriptors[new_frame_index],
             scaled_rectangle
         )
         if new_rectangle is not None:
-            return (new_rectangle * ratio).round().astype(int)
+            return new_rectangle.round().astype(int)
         return None
 
     def render(self):
         self.screen.fill((0, 0, 0))
         current_frame = self.frames[self.current_frame_index]
 
-        y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
-        x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
-        ratio = min(x_ratio, y_ratio)
+        ratio = self.get_ratio()
 
         # blur rectangles
         if self.show_blur:
-            current_frame = blur_rectangles(current_frame, self.get_current_rectangles(), ratio)
+            current_frame = blur_rectangles(current_frame, self.get_current_rectangles())
 
         # draw keypoints
         if self.show_keypoints:
@@ -189,14 +198,17 @@ class Main:
 
         # render rectangle
         if self.show_rects:
-            for rectangle in self.get_current_rectangles():
-                start_pos = (rectangle[0], rectangle[1])
-                end_pos = (rectangle[2], rectangle[3])
-                color = (255, 128, 0) if point_in_rect(self.mouse_position, rectangle) else (255, 0, 0)
+            for rectangle_image in self.get_current_rectangles():
+                mouse_touch = point_in_rect(self.mouse_position, rectangle_image)
+                rectangle_screen = np.round(rectangle_image * ratio).astype(int)
+                start_pos = (rectangle_screen[0], rectangle_screen[1])
+                end_pos = (rectangle_screen[2], rectangle_screen[3])
+                color = (255, 128, 0) if mouse_touch else (255, 0, 0)
                 current_frame = cv2.rectangle(current_frame, start_pos, end_pos, color, 2)
+        # render edit rectangle
         if self.edit_rectangle is not None:
-            start_pos = (self.edit_rectangle[0], self.edit_rectangle[1])
-            end_pos = (self.edit_rectangle[2], self.edit_rectangle[3])
+            start_pos = (int(round(self.edit_rectangle[0] * ratio)), int(round(self.edit_rectangle[1] * ratio)))
+            end_pos = (int(round(self.edit_rectangle[2] * ratio)), int(round(self.edit_rectangle[3] * ratio)))
             current_frame = cv2.rectangle(current_frame, start_pos, end_pos, (255, 128, 0), 2)
 
         # transform for pygame
@@ -221,14 +233,9 @@ class Main:
         if rectangle is not None:
             frame_index = self.current_frame_index + 1
 
-            current_frame = self.frames[frame_index]
-            y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
-            x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
-            ratio = min(x_ratio, y_ratio)
-
             next_rectangle = rectangle
             while frame_index < len(self.frames):
-                next_rectangle = self.get_next_rectangle(next_rectangle, ratio, frame_index-1, frame_index)
+                next_rectangle = self.get_next_rectangle(next_rectangle, frame_index-1, frame_index)
                 if next_rectangle is None:
                     break
                 self.rectangles[frame_index].append(next_rectangle)
@@ -237,20 +244,32 @@ class Main:
             frame_index = self.current_frame_index - 1
             next_rectangle = rectangle
             while frame_index >= 0:
-                next_rectangle = self.get_next_rectangle(next_rectangle, ratio, frame_index+1, frame_index)
+                next_rectangle = self.get_next_rectangle(next_rectangle, frame_index+1, frame_index)
                 if next_rectangle is None:
                     break
                 self.rectangles[frame_index].append(next_rectangle)
                 frame_index -= 1
+
+    def export(self):
+        frame_size = (self.frames[0].shape[1], self.frames[0].shape[0])
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        writer = cv2.VideoWriter('data/output.avi', fourcc, self.fps, frame_size)
+
+        for frame, rect in tqdm(zip(self.frames, self.rectangles), desc='exporting video', total=len(self.frames)):
+            frame = blur_rectangles(frame, rect)
+            writer.write(frame)
+
+        writer.release()
+        print('exporting video done')
 
 
 def main():
     path = "data/input/test.mp4"
     if len(sys.argv) > 1:
         path = sys.argv[1]
-    frames = read_frames(path)
+    frames, fps = read_frames(path)
     keypoints, descriptors = calculate_keypoints(frames, algorithm='sift')
-    main_instance = Main(frames, keypoints, descriptors)
+    main_instance = Main(frames, keypoints, descriptors, fps)
     main_instance.run()
 
 

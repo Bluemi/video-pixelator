@@ -24,13 +24,14 @@ def pixelate_image(frame, cascades):
 
 def read_frames(path):
     capture = cv2.VideoCapture(path)
+    fps = capture.get(cv2.CAP_PROP_FPS)
     frames = []
     while True:
         success, frame = capture.read()
         if not success:
             break
         frames.append(frame)
-    return frames
+    return frames, fps
 
 
 def calculate_keypoints(frames, algorithm='sift'):
@@ -120,11 +121,11 @@ def get_new_rectangle(old_keypoints, new_keypoints, old_descriptors, new_descrip
     return old_rectangle + np.tile(avg_movement, 2)
 
 
-def blur_rectangles(image, rectangles, ratio):
+def blur_rectangles(image, rectangles):
     blurred_image = cv2.GaussianBlur(image, (21, 21), 0)
     mask = np.zeros(image.shape[:2], dtype=float)
     for rect in rectangles:
-        rect = np.round(rect / ratio).astype(int)
+        rect = np.round(rect).astype(int)
         rect = np.maximum(rect, 0)
         mask[rect[1]:rect[3], rect[0]:rect[2]] = 1
 
@@ -138,6 +139,7 @@ def blur_rectangles(image, rectangles, ratio):
 
 def describe(name, a):
     print('--- {} ---'.format(name))
+    print('\tshape: {}'.format(str(a.shape)))
     print('\tdtype: {}'.format(str(a.dtype)))
     print('\tmean: {}'.format(str(np.mean(a))))
     print('\tmin: {}'.format(str(np.min(a))))
