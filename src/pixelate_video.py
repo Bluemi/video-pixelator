@@ -5,7 +5,7 @@ import pygame as pg
 import numpy as np
 import cv2
 
-from utils import read_frames, calculate_keypoints, filter_keypoints, normalize_rectangle, get_new_rectangle
+from utils import read_frames, calculate_keypoints, normalize_rectangle, get_new_rectangle
 
 SCREEN_SIZE = (1200, 675)
 
@@ -77,7 +77,7 @@ class Main:
         elif event.type == pg.MOUSEBUTTONUP:
             if self.edit_rectangle is not None:
                 self.edit_rectangle[2:] = event.pos
-                if self.edit_rectangle[0] != self.edit_rectangle[2] and self.edit_rectangle[1] != self.edit_rectangle[3]:
+                if (self.edit_rectangle[[0, 1]] != self.edit_rectangle[[2, 3]]).all():
                     self.rectangles.append(normalize_rectangle(self.edit_rectangle))
                 self.edit_rectangle = None
             self.update_needed = True
@@ -110,8 +110,9 @@ class Main:
                     self.descriptors[old_frame_index], self.descriptors[new_frame_index],
                     scaled_rectangle
                 )
-                rectangle = (new_rectangle * ratio).round().astype(int)
-                new_rectangles.append(rectangle)
+                if new_rectangle is not None:
+                    rectangle = (new_rectangle * ratio).round().astype(int)
+                    new_rectangles.append(rectangle)
             self.rectangles = new_rectangles
 
     def render(self):

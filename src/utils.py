@@ -70,15 +70,18 @@ def cascade_try(capture):
         frame_number += 1
 
 
+def point_in_rect(point, rect):
+    return rect[0] < point[0] < rect[2] and rect[1] < point[1] < rect[3]
+
+
 def filter_keypoints(keypoints, rectangle, descriptors=None):
     filtered = []
     filtered_descriptors = []
     for index, keypoint in enumerate(keypoints):
-        if rectangle[0] < keypoint.pt[0] < rectangle[2]:
-            if rectangle[1] < keypoint.pt[1] < rectangle[3]:
-                filtered.append(keypoint)
-                if descriptors is not None:
-                    filtered_descriptors.append(descriptors[index])
+        if point_in_rect(keypoint.pt, rectangle):
+            filtered.append(keypoint)
+            if descriptors is not None:
+                filtered_descriptors.append(descriptors[index])
     return filtered, filtered_descriptors
 
 
@@ -91,7 +94,7 @@ def normalize_rectangle(rectangle):
 
 def get_new_rectangle(old_keypoints, new_keypoints, old_descriptors, new_descriptors, old_rectangle):
     if len(old_keypoints) == 0 or len(new_keypoints) == 0:
-        return old_rectangle
+        return None
 
     filtered_keypoints, filtered_descriptors = filter_keypoints(old_keypoints, old_rectangle, old_descriptors)
 
@@ -108,14 +111,13 @@ def get_new_rectangle(old_keypoints, new_keypoints, old_descriptors, new_descrip
             movements.append((old_keypoint.pt, new_keypoint.pt))
 
     if len(movements) == 0:
-        return old_rectangle
+        return None
 
     movements = np.array(movements)
     movements = movements[:, 1, :] - movements[:, 0, :]
     avg_movement = np.median(movements, axis=0)
 
     return old_rectangle + np.tile(avg_movement, 2)
-    # return old_rectangle
 
     # print('---')
     # print('num old descriptors:', len(filtered_descriptors))
