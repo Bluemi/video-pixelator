@@ -11,7 +11,7 @@ SCREEN_SIZE = (1200, 675)
 
 
 class Main:
-    def __init__(self, frames, keypoints, descriptors):
+    def __init__(self, frames, keypoints, descriptors, auto_update_rectangles=False):
         pg.init()
         self.screen = pg.display.set_mode(SCREEN_SIZE, pg.RESIZABLE)
         self.running = True
@@ -26,9 +26,10 @@ class Main:
         # control
         self.edit_rectangle = None
         self.move_rectangle_index = -1
-        self.rectangles = [[]] * len(frames)  # one list of rectangles for every frame
+        self.rectangles = [[] for _ in range(len(frames))]  # one list of rectangles for every frame
         self.show_keypoints = False
         self.mouse_position = pg.mouse.get_pos()
+        self.auto_update_rectangles = auto_update_rectangles
 
     def run(self):
         self.render()
@@ -59,6 +60,9 @@ class Main:
                 self.update_needed = True
             elif text == 's':
                 self.show_keypoints = not self.show_keypoints
+                self.update_needed = True
+            elif text == 't':
+                self.interpolate_rectangle()
                 self.update_needed = True
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_ESCAPE:
@@ -111,7 +115,7 @@ class Main:
         old_frame_index = self.current_frame_index
         self.current_frame_index = min(self.current_frame_index + 1, len(self.frames) - 1)
 
-        if old_frame_index != self.current_frame_index:
+        if self.auto_update_rectangles and old_frame_index != self.current_frame_index:
             new_rects = self.update_rectangles(old_frame_index, self.current_frame_index)
             self.set_current_rectangles(new_rects)
 
@@ -119,7 +123,7 @@ class Main:
         old_frame_index = self.current_frame_index
         self.current_frame_index = max(self.current_frame_index - 1, 0)
 
-        if old_frame_index != self.current_frame_index:
+        if self.auto_update_rectangles and old_frame_index != self.current_frame_index:
             new_rects = self.update_rectangles(old_frame_index, self.current_frame_index)
             self.set_current_rectangles(new_rects)
 
@@ -141,6 +145,9 @@ class Main:
         return new_rectangles
 
     def get_next_rectangle(self, rectangle, ratio, old_frame_index, new_frame_index):
+        print('rect:', rectangle)
+        print('old fi:', old_frame_index)
+        print('new fi:', new_frame_index)
         scaled_rectangle = rectangle / ratio
         new_rectangle = get_new_rectangle(
             self.keypoints[old_frame_index], self.keypoints[new_frame_index],
@@ -192,6 +199,27 @@ class Main:
 
     def set_current_rectangles(self, rectangles):
         self.rectangles[self.current_frame_index] = rectangles
+
+    def interpolate_rectangle(self):
+        rectangle = None
+        for rect in self.get_current_rectangles():
+            if point_in_rect(self.mouse_position, rect):
+                rectangle = rect
+                break
+        if rectangle is not None:
+            frame_index = self.current_frame_index + 1
+
+            current_frame = self.frames[frame_index]
+            y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
+            x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
+            ratio = min(x_ratio, y_ratio)
+
+            while frame_index < len(self.frames):
+                rectangle = self.get_next_rectangle(rectangle, ratio, frame_index-1, frame_index)
+                if rectangle is None:
+                    break
+                self.rectangles[frame_index].append(rectangle)
+                frame_index += 1
 
 
 def main():
