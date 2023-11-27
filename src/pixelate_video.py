@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import enum
 import sys
 
 import pygame as pg
@@ -10,6 +11,36 @@ from utils import read_frames, calculate_keypoints, normalize_rectangle, get_new
     blur_rectangles, describe
 
 SCREEN_SIZE = (1200, 675)
+
+
+class ControlMode(enum.Enum):
+    SINGLE = 0
+    ALL = 1
+    LEFT = 2
+    RIGHT = 3
+
+    @staticmethod
+    def from_mods(mods):
+        if bool(mods & pg.KMOD_CTRL):
+            if bool(mods & pg.KMOD_SHIFT):
+                return ControlMode.LEFT
+            else:
+                return ControlMode.RIGHT
+        else:
+            if bool(mods & pg.KMOD_SHIFT):
+                return ControlMode.ALL
+            else:
+                return ControlMode.SINGLE
+
+    def get_frame_indices(self, current_index, num_frames):
+        if self == ControlMode.SINGLE:
+            return [current_index]
+        elif self == ControlMode.ALL:
+            return list(range(num_frames))
+        elif self == ControlMode.LEFT:
+            return list(range(current_index+1))
+        elif self == ControlMode.RIGHT:
+            return list(range(current_index, num_frames))
 
 
 class Main:
@@ -79,8 +110,8 @@ class Main:
                 self.export()
                 self.update_needed = True
             elif event.text == 'd':
-                rects = [r for r in self.get_current_rectangles() if not point_in_rect(self.mouse_position, r)]
-                self.set_current_rectangles(rects)
+                control_mode = ControlMode.from_mods(pg.key.get_mods())
+                self.remove_rectangles(control_mode)
                 self.update_needed = True
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_ESCAPE:
@@ -126,6 +157,11 @@ class Main:
             self.update_needed = True
         elif event.type == pg.WINDOWRESIZED or event.type == pg.WINDOWENTER or event.type == pg.WINDOWFOCUSGAINED:
             self.update_needed = True
+
+    def remove_rectangles(self, control_mode):
+        # TODO use control mode
+        rects = [r for r in self.get_current_rectangles() if not point_in_rect(self.mouse_position, r)]
+        self.set_current_rectangles(rects)
 
     def get_ratio(self):
         frame_size = self.frames[0].shape
