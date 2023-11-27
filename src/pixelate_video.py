@@ -25,6 +25,7 @@ class Main:
 
         # control
         self.edit_rectangle = None
+        self.move_rectangle_index = -1
         self.rectangles = [[]] * len(frames)  # one list of rectangles for every frame
         self.show_keypoints = False
         self.mouse_position = pg.mouse.get_pos()
@@ -73,14 +74,30 @@ class Main:
                 self.set_current_rectangles(rects)
                 self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
-            self.edit_rectangle = np.array([*event.pos, *event.pos])
+            hovered_rect_index = None
+            for index, rect in enumerate(self.get_current_rectangles()):
+                if point_in_rect(self.mouse_position, rect):
+                    hovered_rect_index = index
+                    break
+            if hovered_rect_index is not None:
+                self.move_rectangle_index = hovered_rect_index
+            else:
+                self.edit_rectangle = np.array([*event.pos, *event.pos])
             self.update_needed = True
         elif event.type == pg.MOUSEMOTION:
             self.mouse_position = event.pos
             if self.edit_rectangle is not None:
                 self.edit_rectangle[2:] = event.pos
+            elif self.move_rectangle_index != -1:
+                c_rect = self.get_current_rectangles()[self.move_rectangle_index]
+                if not (pg.key.get_mods() & pg.KMOD_SHIFT):
+                    c_rect[0] += event.rel[0]
+                    c_rect[1] += event.rel[1]
+                c_rect[2] = max(c_rect[2] + event.rel[0], c_rect[0]+1)
+                c_rect[3] = max(c_rect[3] + event.rel[1], c_rect[1]+1)
             self.update_needed = True
         elif event.type == pg.MOUSEBUTTONUP:
+            self.move_rectangle_index = -1
             if self.edit_rectangle is not None:
                 self.edit_rectangle[2:] = event.pos
                 if (self.edit_rectangle[[0, 1]] != self.edit_rectangle[[2, 3]]).all():
@@ -94,15 +111,15 @@ class Main:
         old_frame_index = self.current_frame_index
         self.current_frame_index = min(self.current_frame_index + 1, len(self.frames) - 1)
 
-        self.update_rectangle(old_frame_index, self.current_frame_index)
+        self.update_rectangles(old_frame_index, self.current_frame_index)
 
     def prev_frame(self):
         old_frame_index = self.current_frame_index
         self.current_frame_index = max(self.current_frame_index - 1, 0)
 
-        self.update_rectangle(old_frame_index, self.current_frame_index)
+        self.update_rectangles(old_frame_index, self.current_frame_index)
 
-    def update_rectangle(self, old_frame_index, new_frame_index):
+    def update_rectangles(self, old_frame_index, new_frame_index):
         if old_frame_index != new_frame_index:
             new_rectangles = []
             for rectangle in self.rectangles[old_frame_index]:
