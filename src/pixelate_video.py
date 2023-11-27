@@ -226,12 +226,22 @@ class Main:
             x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
             ratio = min(x_ratio, y_ratio)
 
+            next_rectangle = rectangle
             while frame_index < len(self.frames):
-                rectangle = self.get_next_rectangle(rectangle, ratio, frame_index-1, frame_index)
-                if rectangle is None:
+                next_rectangle = self.get_next_rectangle(next_rectangle, ratio, frame_index-1, frame_index)
+                if next_rectangle is None:
                     break
-                self.rectangles[frame_index].append(rectangle)
+                self.rectangles[frame_index].append(next_rectangle)
                 frame_index += 1
+
+            frame_index = self.current_frame_index - 1
+            next_rectangle = rectangle
+            while frame_index >= 0:
+                next_rectangle = self.get_next_rectangle(next_rectangle, ratio, frame_index+1, frame_index)
+                if next_rectangle is None:
+                    break
+                self.rectangles[frame_index].append(next_rectangle)
+                frame_index -= 1
 
 
 def main():
