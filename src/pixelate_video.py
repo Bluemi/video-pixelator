@@ -111,32 +111,45 @@ class Main:
         old_frame_index = self.current_frame_index
         self.current_frame_index = min(self.current_frame_index + 1, len(self.frames) - 1)
 
-        self.update_rectangles(old_frame_index, self.current_frame_index)
+        if old_frame_index != self.current_frame_index:
+            new_rects = self.update_rectangles(old_frame_index, self.current_frame_index)
+            self.set_current_rectangles(new_rects)
 
     def prev_frame(self):
         old_frame_index = self.current_frame_index
         self.current_frame_index = max(self.current_frame_index - 1, 0)
 
-        self.update_rectangles(old_frame_index, self.current_frame_index)
+        if old_frame_index != self.current_frame_index:
+            new_rects = self.update_rectangles(old_frame_index, self.current_frame_index)
+            self.set_current_rectangles(new_rects)
 
     def update_rectangles(self, old_frame_index, new_frame_index):
-        if old_frame_index != new_frame_index:
-            new_rectangles = []
-            for rectangle in self.rectangles[old_frame_index]:
-                current_frame = self.frames[new_frame_index]
-                y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
-                x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
-                ratio = min(x_ratio, y_ratio)
-                scaled_rectangle = rectangle / ratio
-                new_rectangle = get_new_rectangle(
-                    self.keypoints[old_frame_index], self.keypoints[new_frame_index],
-                    self.descriptors[old_frame_index], self.descriptors[new_frame_index],
-                    scaled_rectangle
-                )
-                if new_rectangle is not None:
-                    rectangle = (new_rectangle * ratio).round().astype(int)
-                    new_rectangles.append(rectangle)
-            self.set_current_rectangles(new_rectangles)
+        if old_frame_index == new_frame_index:
+            raise ValueError('old_frame_index == new_frame_index ({})'.format(old_frame_index))
+
+        current_frame = self.frames[new_frame_index]
+        y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
+        x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
+        ratio = min(x_ratio, y_ratio)
+
+        new_rectangles = []
+        for rectangle in self.rectangles[old_frame_index]:
+            new_rectangle = self.get_next_rectangle(rectangle, ratio, old_frame_index, new_frame_index)
+            if new_rectangle is not None:
+                new_rectangles.append(new_rectangle)
+
+        return new_rectangles
+
+    def get_next_rectangle(self, rectangle, ratio, old_frame_index, new_frame_index):
+        scaled_rectangle = rectangle / ratio
+        new_rectangle = get_new_rectangle(
+            self.keypoints[old_frame_index], self.keypoints[new_frame_index],
+            self.descriptors[old_frame_index], self.descriptors[new_frame_index],
+            scaled_rectangle
+        )
+        if new_rectangle is not None:
+            return (new_rectangle * ratio).round().astype(int)
+        return None
 
     def render(self):
         self.screen.fill((0, 0, 0))
