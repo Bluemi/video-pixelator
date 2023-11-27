@@ -5,7 +5,7 @@ import pygame as pg
 import numpy as np
 import cv2
 
-from utils import read_frames, calculate_keypoints, normalize_rectangle, get_new_rectangle
+from utils import read_frames, calculate_keypoints, normalize_rectangle, get_new_rectangle, point_in_rect
 
 SCREEN_SIZE = (1200, 675)
 
@@ -27,6 +27,7 @@ class Main:
         self.edit_rectangle = None
         self.rectangles = []
         self.show_keypoints = False
+        self.mouse_position = pg.mouse.get_pos()
 
     def run(self):
         self.render()
@@ -67,13 +68,17 @@ class Main:
             elif event.key == pg.K_RIGHT:
                 self.next_frame()
                 self.update_needed = True
+            elif event.key == pg.K_BACKSPACE or event.key == pg.K_DELETE:
+                self.rectangles = [r for r in self.rectangles if not point_in_rect(self.mouse_position, r)]
+                self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
             self.edit_rectangle = np.array([*event.pos, *event.pos])
             self.update_needed = True
         elif event.type == pg.MOUSEMOTION:
+            self.mouse_position = event.pos
             if self.edit_rectangle is not None:
                 self.edit_rectangle[2:] = event.pos
-                self.update_needed = True
+            self.update_needed = True
         elif event.type == pg.MOUSEBUTTONUP:
             if self.edit_rectangle is not None:
                 self.edit_rectangle[2:] = event.pos
@@ -137,7 +142,8 @@ class Main:
         for rectangle in self.rectangles:
             start_pos = (rectangle[0], rectangle[1])
             end_pos = (rectangle[2], rectangle[3])
-            current_frame = cv2.rectangle(current_frame, start_pos, end_pos, (255, 0, 0), 2)
+            color = (255, 128, 0) if point_in_rect(self.mouse_position, rectangle) else (255, 0, 0)
+            current_frame = cv2.rectangle(current_frame, start_pos, end_pos, color, 2)
         if self.edit_rectangle is not None:
             start_pos = (self.edit_rectangle[0], self.edit_rectangle[1])
             end_pos = (self.edit_rectangle[2], self.edit_rectangle[3])
@@ -152,7 +158,7 @@ class Main:
 
 
 def main():
-    path = "data/input/workshop.mp4"
+    path = "data/input/test.mp4"
     if len(sys.argv) > 1:
         path = sys.argv[1]
     frames = read_frames(path)
