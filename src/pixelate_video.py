@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 import enum
 import sys
+from typing import List
 
 import pygame as pg
 import numpy as np
 import cv2
 from tqdm import tqdm
 
-from utils import read_frames, calculate_keypoints, get_new_rectangle, point_in_rect, blur_rectangles, Rectangle
+from utils import read_frames, calculate_keypoints, get_new_rectangle, blur_rectangles, Rectangle
 
 SCREEN_SIZE = (1200, 675)
 
@@ -60,7 +61,7 @@ class Main:
         self.edit_rectangle = None
         self.move_rectangle_index = -1
         self.next_rect_id = 0
-        self.rectangles = [[] for _ in range(len(frames))]  # one list of rectangles for every frame
+        self.rectangles: List[List[Rectangle]] = [[] for _ in range(len(frames))]  # one list of rectangles every frame
         self.show_keypoints = False
         self.show_rects = True
         self.show_blur = False
@@ -109,10 +110,6 @@ class Main:
             elif text == 'e':
                 self.export()
                 self.update_needed = True
-            elif event.text == 'd':
-                control_mode = ControlMode.from_mods(pg.key.get_mods())
-                self.remove_rectangles(control_mode)
-                self.update_needed = True
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_ESCAPE:
                 self.running = False
@@ -122,6 +119,10 @@ class Main:
             elif event.key == pg.K_RIGHT:
                 self.next_frame()
                 self.update_needed = True
+            elif event.key == pg.K_d:
+                control_mode = ControlMode.from_mods(pg.key.get_mods())
+                self.remove_rectangles(control_mode)
+            self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
             hovered_rect_index = None
             for index, rect in enumerate(self.get_current_rectangles()):
@@ -162,9 +163,9 @@ class Main:
             self.update_needed = True
 
     def remove_rectangles(self, control_mode):
-        # TODO use control mode
-        rects = [r for r in self.get_current_rectangles() if not r.contains(self.mouse_position)]
-        self.set_current_rectangles(rects)
+        rect_ids = [r.ident for r in self.get_current_rectangles() if r.contains(self.mouse_position)]
+        for frame_index in control_mode.get_frame_indices(self.current_frame_index, len(self.frames)):
+            self.rectangles[frame_index] = [r for r in self.rectangles[frame_index] if r.ident not in rect_ids]
 
     def get_ratio(self):
         frame_size = self.frames[0].shape
@@ -226,9 +227,9 @@ class Main:
 
         # draw keypoints
         if self.show_keypoints:
+            # noinspection PyTypeChecker
             current_frame = cv2.drawKeypoints(
-                current_frame, self.keypoints[self.current_frame_index], None,
-                (0, 255, 0), 4
+                current_frame, self.keypoints[self.current_frame_index], None, (0, 255, 0), 4
             )
 
         # scale to screen size
@@ -258,7 +259,7 @@ class Main:
         self.screen.blit(pygame_frame, (0, 0))
         pg.display.update()
 
-    def get_current_rectangles(self):
+    def get_current_rectangles(self) -> List[Rectangle]:
         return self.rectangles[self.current_frame_index]
 
     def set_current_rectangles(self, rectangles):
@@ -292,6 +293,7 @@ class Main:
 
     def export(self):
         frame_size = (self.frames[0].shape[1], self.frames[0].shape[0])
+        # noinspection PyUnresolvedReferences
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
         writer = cv2.VideoWriter('data/output.avi', fourcc, self.fps, frame_size)
 
