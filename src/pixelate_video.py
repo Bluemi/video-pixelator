@@ -29,6 +29,8 @@ class Main:
         self.move_rectangle_index = -1
         self.rectangles = [[] for _ in range(len(frames))]  # one list of rectangles for every frame
         self.show_keypoints = False
+        self.show_rects = True
+        self.show_blur = False
         self.mouse_position = pg.mouse.get_pos()
         self.auto_update_rectangles = auto_update_rectangles
 
@@ -59,8 +61,14 @@ class Main:
             elif text == 'k':
                 self.prev_frame()
                 self.update_needed = True
-            elif text == 's':
+            elif text == 'p':
                 self.show_keypoints = not self.show_keypoints
+                self.update_needed = True
+            elif text == 'b':
+                self.show_blur = not self.show_blur
+                self.update_needed = True
+            elif text == 'r':
+                self.show_rects = not self.show_rects
                 self.update_needed = True
             elif text == 't':
                 self.interpolate_rectangle()
@@ -165,7 +173,8 @@ class Main:
         ratio = min(x_ratio, y_ratio)
 
         # blur rectangles
-        current_frame = blur_rectangles(current_frame, self.get_current_rectangles(), ratio)
+        if self.show_blur:
+            current_frame = blur_rectangles(current_frame, self.get_current_rectangles(), ratio)
 
         # draw keypoints
         if self.show_keypoints:
@@ -179,11 +188,12 @@ class Main:
         current_frame = cv2.resize(current_frame, new_dim)
 
         # render rectangle
-        for rectangle in self.get_current_rectangles():
-            start_pos = (rectangle[0], rectangle[1])
-            end_pos = (rectangle[2], rectangle[3])
-            color = (255, 128, 0) if point_in_rect(self.mouse_position, rectangle) else (255, 0, 0)
-            current_frame = cv2.rectangle(current_frame, start_pos, end_pos, color, 2)
+        if self.show_rects:
+            for rectangle in self.get_current_rectangles():
+                start_pos = (rectangle[0], rectangle[1])
+                end_pos = (rectangle[2], rectangle[3])
+                color = (255, 128, 0) if point_in_rect(self.mouse_position, rectangle) else (255, 0, 0)
+                current_frame = cv2.rectangle(current_frame, start_pos, end_pos, color, 2)
         if self.edit_rectangle is not None:
             start_pos = (self.edit_rectangle[0], self.edit_rectangle[1])
             end_pos = (self.edit_rectangle[2], self.edit_rectangle[3])
