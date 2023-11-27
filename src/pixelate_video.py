@@ -104,9 +104,6 @@ class Main:
             elif text == 'r':
                 self.show_rects = not self.show_rects
                 self.update_needed = True
-            elif text == 't':
-                self.interpolate_rectangle()
-                self.update_needed = True
             elif text == 'e':
                 self.export()
                 self.update_needed = True
@@ -122,6 +119,10 @@ class Main:
             elif event.key == pg.K_d:
                 control_mode = ControlMode.from_mods(pg.key.get_mods())
                 self.remove_rectangles(control_mode)
+            elif event.key == pg.K_t:
+                control_mode = ControlMode.from_mods(pg.key.get_mods())
+                self.interpolate_rectangle(control_mode)
+                self.update_needed = True
             self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
             hovered_rect_index = None
@@ -265,31 +266,38 @@ class Main:
     def set_current_rectangles(self, rectangles):
         self.rectangles[self.current_frame_index] = rectangles
 
-    def interpolate_rectangle(self):
-        rectangle = None
+    def add_rectangle(self, frame_index: int, rectangle):
+        current_rects = [r for r in self.rectangles[frame_index] if r.ident != rectangle.ident]
+        current_rects.append(rectangle)
+        self.rectangles[frame_index] = current_rects
+
+    def interpolate_rectangle(self, control_mode):
+        rectangles = []
         for rect in self.get_current_rectangles():
             if rect.contains(self.mouse_position):
-                rectangle = rect
+                rectangles.append(rect)
                 break
-        if rectangle is not None:
-            frame_index = self.current_frame_index + 1
 
-            next_rectangle = rectangle
-            while frame_index < len(self.frames):
-                next_rectangle = self.get_next_rectangle(next_rectangle, frame_index-1, frame_index)
-                if next_rectangle is None:
-                    break
-                self.rectangles[frame_index].append(next_rectangle)
-                frame_index += 1
+        for rectangle in rectangles:
+            if control_mode in (ControlMode.SINGLE, ControlMode.ALL, ControlMode.RIGHT):
+                frame_index = self.current_frame_index + 1
+                next_rectangle = rectangle
+                while frame_index < len(self.frames):
+                    next_rectangle = self.get_next_rectangle(next_rectangle, frame_index-1, frame_index)
+                    if next_rectangle is None:
+                        break
+                    self.add_rectangle(frame_index, next_rectangle)
+                    frame_index += 1
 
-            frame_index = self.current_frame_index - 1
-            next_rectangle = rectangle
-            while frame_index >= 0:
-                next_rectangle = self.get_next_rectangle(next_rectangle, frame_index+1, frame_index)
-                if next_rectangle is None:
-                    break
-                self.rectangles[frame_index].append(next_rectangle)
-                frame_index -= 1
+            if control_mode in (ControlMode.SINGLE, ControlMode.ALL, ControlMode.LEFT):
+                frame_index = self.current_frame_index - 1
+                next_rectangle = rectangle
+                while frame_index >= 0:
+                    next_rectangle = self.get_next_rectangle(next_rectangle, frame_index+1, frame_index)
+                    if next_rectangle is None:
+                        break
+                    self.rectangles[frame_index].append(next_rectangle)
+                    frame_index -= 1
 
     def export(self):
         frame_size = (self.frames[0].shape[1], self.frames[0].shape[0])
