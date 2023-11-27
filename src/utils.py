@@ -125,6 +125,7 @@ def blur_rectangles(image, rectangles, ratio):
     mask = np.zeros(image.shape[:2], dtype=float)
     for rect in rectangles:
         rect = np.round(rect / ratio).astype(int)
+        rect = np.maximum(rect, 0)
         mask[rect[1]:rect[3], rect[0]:rect[2]] = 1
 
     mask = cv2.GaussianBlur(mask, (21, 21), 0)
