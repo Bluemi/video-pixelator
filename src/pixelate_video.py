@@ -121,7 +121,7 @@ class Main:
                 self.remove_rectangles(control_mode)
             elif event.key == pg.K_t:
                 control_mode = ControlMode.from_mods(pg.key.get_mods())
-                self.interpolate_rectangle(control_mode)
+                self.track_rectangles(control_mode)
                 self.update_needed = True
             self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
@@ -271,7 +271,7 @@ class Main:
         current_rects.append(rectangle)
         self.rectangles[frame_index] = current_rects
 
-    def interpolate_rectangle(self, control_mode):
+    def track_rectangles(self, control_mode):
         rectangles = []
         for rect in self.get_current_rectangles():
             if rect.contains(self.mouse_position):
