@@ -8,7 +8,7 @@ import numpy as np
 import cv2
 from tqdm import tqdm
 
-from utils import read_frames, calculate_keypoints, get_new_rectangle, blur_rectangles, Rectangle
+from utils import read_frames, calculate_keypoints, get_new_rectangle, blur_rectangles, Rectangle, describe
 
 SCREEN_SIZE = (1200, 675)
 
@@ -134,7 +134,7 @@ class Main:
                 self.move_rectangle_index = hovered_rect_index
             else:
                 self.edit_rectangle = Rectangle(
-                    self.next_rect_id, np.array([*self.mouse_position, *self.mouse_position])
+                    self.next_rect_id, np.array([*self.mouse_position, *self.mouse_position], dtype=float)
                 )
                 self.next_rect_id += 1
             self.update_needed = True
@@ -143,13 +143,13 @@ class Main:
             if self.edit_rectangle is not None:
                 self.edit_rectangle.rect[2:] = self.mouse_position
             elif self.move_rectangle_index != -1:
-                current_rect = self.get_current_rectangles()[self.move_rectangle_index]
+                move_rectangle = self.get_current_rectangles()[self.move_rectangle_index]
+                ratio = self.get_ratio()
                 if not (pg.key.get_mods() & pg.KMOD_SHIFT):
-                    ratio = self.get_ratio()
-                    current_rect.rect[0] += int(round(event.rel[0] * ratio))
-                    current_rect.rect[1] += int(round(event.rel[1] * ratio))
-                current_rect.rect[2] = max(current_rect.rect[2] + int(round(event.rel[0])), current_rect.rect[0]+1)
-                current_rect.rect[3] = max(current_rect.rect[3] + int(round(event.rel[1])), current_rect.rect[1]+1)
+                    move_rectangle.rect[0] += event.rel[0] / ratio
+                    move_rectangle.rect[1] += event.rel[1] / ratio
+                move_rectangle.rect[2] = max(move_rectangle.rect[2] + event.rel[0] / ratio, move_rectangle.rect[0]+1)
+                move_rectangle.rect[3] = max(move_rectangle.rect[3] + event.rel[1] / ratio, move_rectangle.rect[1]+1)
             self.update_needed = True
         elif event.type == pg.MOUSEBUTTONUP:
             self.move_rectangle_index = -1
@@ -212,7 +212,6 @@ class Main:
             rectangle
         )
         if new_rectangle is not None:
-            new_rectangle.to_int()
             return new_rectangle
         return None
 
@@ -296,7 +295,7 @@ class Main:
                     next_rectangle = self.get_next_rectangle(next_rectangle, frame_index+1, frame_index)
                     if next_rectangle is None:
                         break
-                    self.rectangles[frame_index].append(next_rectangle)
+                    self.add_rectangle(frame_index, next_rectangle)
                     frame_index -= 1
 
     def export(self):

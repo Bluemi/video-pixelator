@@ -87,7 +87,7 @@ def blur_rectangles(image, rectangles) -> np.ndarray:
     blurred_image = cv2.GaussianBlur(image, (21, 21), 0)
     mask = np.zeros(image.shape[:2], dtype=float)
     for rect in rectangles:
-        rect = np.round(rect.rect).astype(int)
+        rect = rect.to_int().rect
         rect = np.maximum(rect, 0)
         mask[rect[1]:rect[3], rect[0]:rect[2]] = 1
 
@@ -126,4 +126,4 @@ class Rectangle:
         return self.rect[0] < self.rect[2] and self.rect[1] < self.rect[3]
 
     def to_int(self):
-        self.rect = self.rect.round().astype(int)
+        return Rectangle(self.ident, self.rect.round().astype(int))
