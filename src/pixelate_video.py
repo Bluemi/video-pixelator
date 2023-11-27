@@ -25,7 +25,7 @@ class Main:
 
         # control
         self.edit_rectangle = None
-        self.rectangles = []
+        self.rectangles = [[]] * len(frames)  # one list of rectangles for every frame
         self.show_keypoints = False
         self.mouse_position = pg.mouse.get_pos()
 
@@ -69,7 +69,8 @@ class Main:
                 self.next_frame()
                 self.update_needed = True
             elif event.key == pg.K_BACKSPACE or event.key == pg.K_DELETE:
-                self.rectangles = [r for r in self.rectangles if not point_in_rect(self.mouse_position, r)]
+                rects = [r for r in self.get_current_rectangles() if not point_in_rect(self.mouse_position, r)]
+                self.set_current_rectangles(rects)
                 self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
             self.edit_rectangle = np.array([*event.pos, *event.pos])
@@ -83,7 +84,7 @@ class Main:
             if self.edit_rectangle is not None:
                 self.edit_rectangle[2:] = event.pos
                 if (self.edit_rectangle[[0, 1]] != self.edit_rectangle[[2, 3]]).all():
-                    self.rectangles.append(normalize_rectangle(self.edit_rectangle))
+                    self.get_current_rectangles().append(normalize_rectangle(self.edit_rectangle))
                 self.edit_rectangle = None
             self.update_needed = True
         elif event.type == pg.WINDOWRESIZED or event.type == pg.WINDOWENTER or event.type == pg.WINDOWFOCUSGAINED:
@@ -104,7 +105,7 @@ class Main:
     def update_rectangle(self, old_frame_index, new_frame_index):
         if old_frame_index != new_frame_index:
             new_rectangles = []
-            for rectangle in self.rectangles:
+            for rectangle in self.rectangles[old_frame_index]:
                 current_frame = self.frames[new_frame_index]
                 y_ratio = pg.display.get_window_size()[1] / current_frame.shape[0]
                 x_ratio = pg.display.get_window_size()[0] / current_frame.shape[1]
@@ -118,7 +119,7 @@ class Main:
                 if new_rectangle is not None:
                     rectangle = (new_rectangle * ratio).round().astype(int)
                     new_rectangles.append(rectangle)
-            self.rectangles = new_rectangles
+            self.set_current_rectangles(new_rectangles)
 
     def render(self):
         self.screen.fill((0, 0, 0))
@@ -139,7 +140,7 @@ class Main:
         current_frame = cv2.resize(current_frame, new_dim)
 
         # render rectangle
-        for rectangle in self.rectangles:
+        for rectangle in self.get_current_rectangles():
             start_pos = (rectangle[0], rectangle[1])
             end_pos = (rectangle[2], rectangle[3])
             color = (255, 128, 0) if point_in_rect(self.mouse_position, rectangle) else (255, 0, 0)
@@ -155,6 +156,12 @@ class Main:
         pygame_frame = pg.surfarray.make_surface(current_frame)
         self.screen.blit(pygame_frame, (0, 0))
         pg.display.update()
+
+    def get_current_rectangles(self):
+        return self.rectangles[self.current_frame_index]
+
+    def set_current_rectangles(self, rectangles):
+        self.rectangles[self.current_frame_index] = rectangles
 
 
 def main():
