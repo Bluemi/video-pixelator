@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import enum
+import json
 import sys
 from typing import List
 
@@ -8,7 +9,7 @@ import numpy as np
 import cv2
 from tqdm import tqdm
 
-from utils import read_frames, calculate_keypoints, get_new_rectangle, blur_rectangles, Rectangle, describe
+from utils import read_frames, calculate_keypoints, get_new_rectangle, blur_rectangles, Rectangle
 
 SCREEN_SIZE = (1200, 675)
 
@@ -104,9 +105,6 @@ class Main:
             elif text == 'r':
                 self.show_rects = not self.show_rects
                 self.update_needed = True
-            elif text == 'e':
-                self.export()
-                self.update_needed = True
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_ESCAPE:
                 self.running = False
@@ -122,6 +120,12 @@ class Main:
             elif event.key == pg.K_t:
                 control_mode = ControlMode.from_mods(pg.key.get_mods())
                 self.track_rectangles(control_mode)
+                self.update_needed = True
+            elif event.key == pg.K_e:
+                if pg.key.get_mods() & pg.KMOD_SHIFT:
+                    self.export_rects()
+                else:
+                    self.export_video()
                 self.update_needed = True
             self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
@@ -298,7 +302,23 @@ class Main:
                     self.add_rectangle(frame_index, next_rectangle)
                     frame_index -= 1
 
-    def export(self):
+    def export_rects(self):
+        rect_export = []
+        for frame in tqdm(self.rectangles, desc='exporting rectangles'):
+            frame_export = []
+            for rect in frame:
+                json_data = {
+                    'id': rect.ident,
+                    'coord_ltrb': list(map(int, rect.rect))
+                }
+                frame_export.append(json_data)
+            rect_export.append(frame_export)
+        output_file = 'data/rectangles.json'
+        with open(output_file, 'w') as f:
+            json.dump(rect_export, f)
+        print(output_file, 'created')
+
+    def export_video(self):
         frame_size = (self.frames[0].shape[1], self.frames[0].shape[0])
         # noinspection PyUnresolvedReferences
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
@@ -309,7 +329,7 @@ class Main:
             writer.write(frame)
 
         writer.release()
-        print('exporting video done')
+        print('data/output.avi created')
 
 
 def main():
