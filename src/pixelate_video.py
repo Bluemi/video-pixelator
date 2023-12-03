@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import enum
 import json
-import sys
+import argparse
+import os
+import pathlib
 from typing import List
 
 import pygame as pg
@@ -45,7 +47,7 @@ class ControlMode(enum.Enum):
 
 
 class Main:
-    def __init__(self, frames, keypoints, descriptors, fps, auto_update_rectangles=False):
+    def __init__(self, frames, keypoints, descriptors, fps, outdir):
         pg.init()
         self.screen = pg.display.set_mode(SCREEN_SIZE, pg.RESIZABLE)
         self.running = True
@@ -67,7 +69,7 @@ class Main:
         self.show_rects = True
         self.show_blur = False
         self.mouse_position = self.get_mouse_in_image_coordinates()
-        self.auto_update_rectangles = auto_update_rectangles
+        self.outdir = outdir
 
     def run(self):
         self.render()
@@ -182,20 +184,10 @@ class Main:
         return np.round(np.array(pg.mouse.get_pos()) / self.get_ratio()).astype(int)
 
     def next_frame(self):
-        old_frame_index = self.current_frame_index
         self.current_frame_index = min(self.current_frame_index + 1, len(self.frames) - 1)
 
-        if self.auto_update_rectangles and old_frame_index != self.current_frame_index:
-            new_rects = self.update_rectangles(old_frame_index, self.current_frame_index)
-            self.set_current_rectangles(new_rects)
-
     def prev_frame(self):
-        old_frame_index = self.current_frame_index
         self.current_frame_index = max(self.current_frame_index - 1, 0)
-
-        if self.auto_update_rectangles and old_frame_index != self.current_frame_index:
-            new_rects = self.update_rectangles(old_frame_index, self.current_frame_index)
-            self.set_current_rectangles(new_rects)
 
     def update_rectangles(self, old_frame_index, new_frame_index):
         if old_frame_index == new_frame_index:
@@ -302,6 +294,9 @@ class Main:
                     self.add_rectangle(frame_index, next_rectangle)
                     frame_index -= 1
 
+    def ensure_outdir(self):
+        os.makedirs(self.outdir, exist_ok=True)
+
     def export_rects(self):
         rect_export = []
         for frame in tqdm(self.rectangles, desc='exporting rectangles'):
@@ -313,32 +308,47 @@ class Main:
                 }
                 frame_export.append(json_data)
             rect_export.append(frame_export)
-        output_file = 'data/rectangles.json'
+        self.ensure_outdir()
+        output_file = self.outdir / 'rectangles.json'
         with open(output_file, 'w') as f:
             json.dump(rect_export, f)
         print(output_file, 'created')
 
     def export_video(self):
+        self.ensure_outdir()
+
         frame_size = (self.frames[0].shape[1], self.frames[0].shape[0])
         # noinspection PyUnresolvedReferences
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        writer = cv2.VideoWriter('data/output.avi', fourcc, self.fps, frame_size)
+        output_file = self.outdir / 'output.avi'
+        writer = cv2.VideoWriter(str(output_file), fourcc, self.fps, frame_size)
 
         for frame, rect in tqdm(zip(self.frames, self.rectangles), desc='exporting video', total=len(self.frames)):
             frame = blur_rectangles(frame, rect)
             writer.write(frame)
 
         writer.release()
-        print('data/output.avi created')
+        print(output_file, 'created')
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Track, edit and blur regions in videos.')
+    parser.add_argument(
+        'videofile', type=str, nargs='?', default='data/input/test.mp4',
+        help='The video file to view and edit.'
+    )
+    parser.add_argument(
+        '--outdir', '-o', type=pathlib.Path, default=pathlib.Path('data'),
+        help='Directory in which output files are written.'
+    )
+    return parser.parse_args()
 
 
 def main():
-    path = "data/input/test.mp4"
-    if len(sys.argv) > 1:
-        path = sys.argv[1]
-    frames, fps = read_frames(path)
+    args = parse_args()
+    frames, fps = read_frames(args.videofile)
     keypoints, descriptors = calculate_keypoints(frames, algorithm='sift')
-    main_instance = Main(frames, keypoints, descriptors, fps)
+    main_instance = Main(frames, keypoints, descriptors, fps, args.outdir)
     main_instance.run()
 
 
