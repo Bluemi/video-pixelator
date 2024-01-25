@@ -304,7 +304,7 @@ class Main:
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
         writer = cv2.VideoWriter('data/output.avi', fourcc, self.fps, frame_size)
 
-        for frame, rect in tqdm(zip(self.frames, self.rectangles), desc='exporting video', total=len(self.frames)):
+        for frame, rect in tqdm(zip(self.frames, self.rectangles), desc='exporting video', total=len(self.frames), colour='#666666'):
             frame = blur_rectangles(frame, rect)
             writer.write(frame)
 

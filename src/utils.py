@@ -32,7 +32,7 @@ def calculate_keypoints(frames, algorithm='sift'):
         raise ValueError('Unknown Algorithm {}'.format(algorithm))
     keypoints = []
     descriptors = []
-    for frame in tqdm(frames, desc="calculating keypoints"):
+    for frame in tqdm(frames, desc="calculating keypoints", colour='#666666'):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         keypoint, descriptor = algo.detectAndCompute(gray, None)
         keypoints.append(keypoint)
