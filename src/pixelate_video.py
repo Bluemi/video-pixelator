@@ -59,6 +59,8 @@ class Main:
         self.descriptors = descriptors
         self.current_frame_index = 0
         self.fps = fps
+        self.blur_sigma = 21
+        self.mask_blur_sigma = 21
 
         # control
         self.edit_rectangle = None
@@ -129,6 +131,18 @@ class Main:
                 else:
                     self.export_video()
                 self.update_needed = True
+            elif event.key == pg.K_PLUS:
+                if not bool(pg.key.get_mods() & pg.KMOD_SHIFT):
+                    self.blur_sigma += 2
+                else:
+                    self.mask_blur_sigma += 2
+            elif event.key == pg.K_MINUS:
+                if not bool(pg.key.get_mods() & pg.KMOD_SHIFT):
+                    self.blur_sigma = max(self.blur_sigma - 2, 1)
+                else:
+                    self.mask_blur_sigma = max(self.mask_blur_sigma - 2, 1)
+            print(f'blur_sigma={self.blur_sigma}  mask_blur_sigma={self.mask_blur_sigma}')
+
             self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
             hovered_rect_index = None
@@ -219,7 +233,10 @@ class Main:
 
         # blur rectangles
         if self.show_blur:
-            current_frame = blur_rectangles(current_frame, self.get_current_rectangles())
+            current_frame = blur_rectangles(
+                current_frame, self.get_current_rectangles(),
+                blur_sigma=self.blur_sigma, mask_blur_sigma=self.mask_blur_sigma
+            )
 
         # draw keypoints
         if self.show_keypoints:
@@ -324,7 +341,7 @@ class Main:
         writer = cv2.VideoWriter(str(output_file), fourcc, self.fps, frame_size)
 
         for frame, rect in tqdm(zip(self.frames, self.rectangles), desc='exporting video', total=len(self.frames)):
-            frame = blur_rectangles(frame, rect)
+            frame = blur_rectangles(frame, rect, blur_sigma=self.blur_sigma, mask_blur_sigma=self.mask_blur_sigma)
             writer.write(frame)
 
         writer.release()

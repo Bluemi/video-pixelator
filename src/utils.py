@@ -83,8 +83,8 @@ def get_new_rectangle(old_keypoints, new_keypoints, old_descriptors, new_descrip
     return Rectangle(old_rectangle.ident, old_rectangle.rect + np.tile(avg_movement, 2))
 
 
-def blur_rectangles(image, rectangles) -> np.ndarray:
-    blurred_image = cv2.GaussianBlur(image, (21, 21), 0)
+def blur_rectangles(image, rectangles, blur_sigma=21, mask_blur_sigma=21) -> np.ndarray:
+    blurred_image = cv2.GaussianBlur(image, (blur_sigma, blur_sigma), 0)
     mask = np.zeros(image.shape[:2], dtype=float)
     for rect in rectangles:
         rect = rect.to_int().rect
