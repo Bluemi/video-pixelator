@@ -32,7 +32,7 @@ def calculate_keypoints(frames, algorithm='sift'):
         raise ValueError('Unknown Algorithm {}'.format(algorithm))
     keypoints = []
     descriptors = []
-    for frame in tqdm(frames, desc="calculating keypoints"):
+    for frame in tqdm(frames, desc="calculating keypoints", colour='#666666'):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         keypoint, descriptor = algo.detectAndCompute(gray, None)
         keypoints.append(keypoint)
@@ -91,7 +91,7 @@ def blur_rectangles(image, rectangles, blur_sigma=21, mask_blur_sigma=21) -> np.
         rect = np.maximum(rect, 0)
         mask[rect[1]:rect[3], rect[0]:rect[2]] = 1
 
-    mask = cv2.GaussianBlur(mask, (21, 21), 0)
+    mask = cv2.GaussianBlur(mask, (mask_blur_sigma, mask_blur_sigma), 0)
     mask = mask.reshape((image.shape[0], image.shape[1], 1))
 
     image = np.round(blurred_image * mask + image * (1.0 - mask))

@@ -168,7 +168,9 @@ class Main:
                 if not (pg.key.get_mods() & pg.KMOD_SHIFT):
                     move_rectangle.rect[0] += event.rel[0] / ratio
                     move_rectangle.rect[1] += event.rel[1] / ratio
+                # noinspection PyTypeChecker
                 move_rectangle.rect[2] = max(move_rectangle.rect[2] + event.rel[0] / ratio, move_rectangle.rect[0]+1)
+                # noinspection PyTypeChecker
                 move_rectangle.rect[3] = max(move_rectangle.rect[3] + event.rel[1] / ratio, move_rectangle.rect[1]+1)
             self.update_needed = True
         elif event.type == pg.MOUSEBUTTONUP:
@@ -331,7 +333,7 @@ class Main:
             json.dump(rect_export, f)
         print(output_file, 'created')
 
-    def export_video(self):
+    def export_video(self, verbose=True):
         self.ensure_outdir()
 
         frame_size = (self.frames[0].shape[1], self.frames[0].shape[0])
@@ -340,7 +342,11 @@ class Main:
         output_file = self.outdir / 'output.avi'
         writer = cv2.VideoWriter(str(output_file), fourcc, self.fps, frame_size)
 
-        for frame, rect in tqdm(zip(self.frames, self.rectangles), desc='exporting video', total=len(self.frames)):
+        iterator = zip(self.frames, self.rectangles)
+        if verbose:
+            iterator = tqdm(iterator, desc='export video', total=len(self.frames), colour='#666666')
+
+        for frame, rect in iterator:
             frame = blur_rectangles(frame, rect, blur_sigma=self.blur_sigma, mask_blur_sigma=self.mask_blur_sigma)
             writer.write(frame)
 
