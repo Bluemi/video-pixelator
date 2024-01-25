@@ -141,7 +141,7 @@ class Main:
                     self.blur_sigma = max(self.blur_sigma - 2, 1)
                 else:
                     self.mask_blur_sigma = max(self.mask_blur_sigma - 2, 1)
-            print(f'blur_sigma={self.blur_sigma}  mask_blur_sigma={self.mask_blur_sigma}')
+            # print(f'blur_sigma={self.blur_sigma}  mask_blur_sigma={self.mask_blur_sigma}')
 
             self.update_needed = True
         elif event.type == pg.MOUSEBUTTONDOWN:
