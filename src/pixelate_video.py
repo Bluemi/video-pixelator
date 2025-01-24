@@ -46,8 +46,23 @@ class ControlMode(enum.Enum):
             return list(range(current_index, num_frames))
 
 
+def import_rects(path: pathlib.Path) -> List[List[Rectangle]]:
+    with open(path, 'r') as f:
+        rects = json.load(f)
+
+    rectangles = []
+    for frame in rects:
+        frame_rects = []
+        for r in frame:
+            rectangle = Rectangle(r['id'], np.array(r['coord_ltrb'], dtype=np.float32))
+            rectangle.normalize()
+            frame_rects.append(rectangle)
+        rectangles.append(frame_rects)
+    return rectangles
+
+
 class Main:
-    def __init__(self, frames, keypoints, descriptors, fps, outdir):
+    def __init__(self, frames, keypoints, descriptors, fps, outdir, rects):
         pg.init()
         self.screen = pg.display.set_mode(SCREEN_SIZE, pg.RESIZABLE)
         self.running = True
@@ -66,7 +81,12 @@ class Main:
         self.edit_rectangle = None
         self.move_rectangle_index = -1
         self.next_rect_id = 0
-        self.rectangles: List[List[Rectangle]] = [[] for _ in range(len(frames))]  # one list of rectangles every frame
+        if rects is not None:
+            assert len(rects) == len(frames), 'rects and frames must have the same length'
+            rectangles = rects
+        else:
+            rectangles = [[] for _ in range(len(frames))]
+        self.rectangles: List[List[Rectangle]] = rectangles  # one list of rectangles every frame
         self.show_keypoints = False
         self.show_rects = True
         self.show_blur = False
@@ -253,13 +273,7 @@ class Main:
 
         # render rectangle
         if self.show_rects:
-            for rectangle_image in self.get_current_rectangles():
-                mouse_touch = rectangle_image.contains(self.mouse_position)
-                rectangle_screen = np.round(rectangle_image.rect * ratio).astype(int)
-                start_pos = (rectangle_screen[0], rectangle_screen[1])
-                end_pos = (rectangle_screen[2], rectangle_screen[3])
-                color = (255, 128, 0) if mouse_touch else (255, 0, 0)
-                current_frame = cv2.rectangle(current_frame, start_pos, end_pos, color, 2)
+            current_frame = self.draw_rects(current_frame, ratio)
         # render edit rectangle
         if self.edit_rectangle is not None:
             er = self.edit_rectangle.rect
@@ -273,6 +287,16 @@ class Main:
         pygame_frame = pg.surfarray.make_surface(current_frame)
         self.screen.blit(pygame_frame, (0, 0))
         pg.display.update()
+
+    def draw_rects(self, current_frame, ratio):
+        for rectangle_image in self.get_current_rectangles():
+            mouse_touch = rectangle_image.contains(self.mouse_position)
+            rectangle_screen = np.round(rectangle_image.rect * ratio).astype(int)
+            start_pos = (rectangle_screen[0], rectangle_screen[1])
+            end_pos = (rectangle_screen[2], rectangle_screen[3])
+            color = (255, 128, 0) if mouse_touch else (255, 0, 0)
+            current_frame = cv2.rectangle(current_frame, start_pos, end_pos, color, 2)
+        return current_frame
 
     def get_current_rectangles(self) -> List[Rectangle]:
         return self.rectangles[self.current_frame_index]
@@ -364,14 +388,20 @@ def parse_args():
         '--outdir', '-o', type=pathlib.Path, default=pathlib.Path('data'),
         help='Directory in which output files are written.'
     )
+    parser.add_argument(
+        '--rects', type=pathlib.Path, default=None, help='Json file containing rectangles to edit.'
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    rects = None
+    if args.rects is not None:
+        rects = import_rects(args.rects)
     frames, fps = read_frames(args.videofile)
     keypoints, descriptors = calculate_keypoints(frames, algorithm='sift')
-    main_instance = Main(frames, keypoints, descriptors, fps, args.outdir)
+    main_instance = Main(frames, keypoints, descriptors, fps, args.outdir, rects)
     main_instance.run()
 
 

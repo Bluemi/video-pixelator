@@ -23,10 +23,13 @@ def read_frames(path):
 
 def calculate_keypoints(frames, algorithm='sift'):
     if algorithm == 'sift':
+        # noinspection PyUnresolvedReferences
         algo = cv2.SIFT_create()
     elif algorithm == 'surf':
+        # noinspection PyUnresolvedReferences
         algo = cv2.xfeatures2d.SURF_create()
     elif algorithm == 'orb':
+        # noinspection PyUnresolvedReferences
         algo = cv2.ORB_create()
     else:
         raise ValueError('Unknown Algorithm {}'.format(algorithm))
