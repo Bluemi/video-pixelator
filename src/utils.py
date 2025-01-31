@@ -99,6 +99,10 @@ def blur_rectangles(image, rectangles, blur_sigma=21, mask_blur_sigma=21) -> np.
 
     image = np.round(blurred_image * mask + image * (1.0 - mask))
 
+    return normalize_image(image)
+
+
+def normalize_image(image):
     return np.minimum(np.maximum(image, 0), 255).astype(np.uint8)
 
 

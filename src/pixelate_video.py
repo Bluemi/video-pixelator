@@ -11,7 +11,8 @@ import numpy as np
 import cv2
 from tqdm import tqdm
 
-from utils import read_frames, calculate_keypoints, get_new_rectangle, blur_rectangles, Rectangle
+from utils import read_frames, calculate_keypoints, get_new_rectangle, blur_rectangles, Rectangle, normalize_image, \
+    show_image
 
 SCREEN_SIZE = (1200, 675)
 
@@ -370,9 +371,15 @@ class Main:
         if verbose:
             iterator = tqdm(iterator, desc='export video', total=len(self.frames), colour='#666666')
 
-        for frame, rect in iterator:
-            frame = blur_rectangles(frame, rect, blur_sigma=self.blur_sigma, mask_blur_sigma=self.mask_blur_sigma)
-            writer.write(frame)
+        old_current_frame_index = self.current_frame_index
+        for frame_index, (frame, rects) in enumerate(iterator):
+            # frame = blur_rectangles(frame, rects, blur_sigma=self.blur_sigma, mask_blur_sigma=self.mask_blur_sigma)
+            self.current_frame_index = frame_index
+            frame = self.draw_rects(frame, 1.0)
+            writer.write(normalize_image(frame))
+
+        # reset current frame index
+        self.current_frame_index = old_current_frame_index
 
         writer.release()
         print(output_file, 'created')
